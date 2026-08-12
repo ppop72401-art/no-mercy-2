@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>UNO No Mercy</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #111b21; --surface: #1f2c34;
+            --primary: #58cc02; --primary-shadow: #46a302;
+            --card-red: #ff4b4b; --card-red-shadow: #cb3232;
+            --card-blue: #1cb0f6; --card-blue-shadow: #1899d6;
+            --card-green: #58cc02; --card-green-shadow: #46a302;
+            --card-yellow: #ffc800; --card-yellow-shadow: #cca000;
+            --card-black: #2b333a; --card-black-shadow: #1d2328;
+            --font-main: 'Tajawal', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font-main); user-select: none; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg-main); color: white; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+        /* الأزرار بأسلوب دولينغو */
+        .btn-duo {
+            background: var(--primary); color: white; font-size: 1.4rem; font-weight: 900;
+            padding: 15px 30px; border-radius: 20px; border: none;
+            border-bottom: 6px solid var(--primary-shadow); cursor: pointer;
+            transition: 0.1s cubic-bezier(0.34, 1.56, 0.64, 1); will-change: transform;
+        }
+        .btn-duo:active { transform: translateY(6px); border-bottom-width: 0; margin-top: 6px; }
+        .btn-duo.blue { background: var(--card-blue); border-bottom-color: var(--card-blue-shadow); }
+        .btn-duo.red { background: var(--card-red); border-bottom-color: var(--card-red-shadow); }
+
+        /* الشاشات */
+        #lobby-screen, #game-screen { display: flex; flex-direction: column; height: 100%; width: 100%; position: absolute; top: 0; left: 0; }
+        #game-screen { display: none; justify-content: space-between; }
+        
+        .lobby-container { margin: auto; text-align: center; background: var(--surface); padding: 40px; border-radius: 30px; border-bottom: 8px solid var(--card-black-shadow); width: 90%; max-width: 400px; }
+        input { padding: 15px; border-radius: 16px; font-size: 1.2rem; border: none; margin-bottom: 20px; text-align: center; width: 100%; font-weight: bold; }
+
+        /* الطاولة والأوراق */
+        .hud { display: flex; justify-content: space-between; padding: 15px; background: var(--surface); border-bottom: 4px solid var(--card-black-shadow); font-weight: bold; font-size: 1.2rem; }
+        .table-area { flex: 1; display: flex; justify-content: center; align-items: center; gap: 30px; position: relative; }
+        
+        .card {
+            width: 75px; height: 115px; border-radius: 12px; display: flex; justify-content: center; align-items: center;
+            font-size: 2rem; font-weight: 900; border-bottom: 6px solid; cursor: pointer;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            position: relative; overflow: hidden;
+        }
+        .card::after { content: ''; position: absolute; top:4px; left:4px; right:4px; bottom:4px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.2); pointer-events: none; }
+        
+        .card.red { background: var(--card-red); border-bottom-color: var(--card-red-shadow); }
+        .card.blue { background: var(--card-blue); border-bottom-color: var(--card-blue-shadow); }
+        .card.green { background: var(--card-green); border-bottom-color: var(--card-green-shadow); }
+        .card.yellow { background: var(--card-yellow); border-bottom-color: var(--card-yellow-shadow); color: black; }
+        .card.yellow::after { border-color: rgba(0,0,0,0.2); }
+        .card.black { background: var(--card-black); border-bottom-color: var(--card-black-shadow); }
+
+        .hand-container { height: 140px; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 20px; overflow-x: auto; }
+        .hand-container .card { margin: 0 -15px; }
+        .hand-container .card:hover { transform: translateY(-20px); z-index: 10; }
+
+        .opponents { display: flex; justify-content: center; gap: 15px; padding: 10px; }
+        .opp-badge { background: var(--surface); padding: 10px 20px; border-radius: 16px; border-bottom: 4px solid var(--card-black-shadow); font-weight: bold; text-align: center; }
+        .opp-badge.active { border-color: var(--card-yellow); box-shadow: 0 0 15px rgba(255,200,0,0.4); }
+
+        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--card-red); padding: 15px 25px; border-radius: 20px; font-weight: bold; display: none; z-index: 1000; border-bottom: 4px solid var(--card-red-shadow); }
+    </style>
+</head>
+<body>
+
+    <div id="toast">رسالة تحكيمية</div>
+
+    <!-- شاشة الانتظار -->
+    <div id="lobby-screen">
+        <div class="lobby-container">
+            <h1 style="font-size: 3.5rem; color: var(--card-red); margin-bottom: 0;">UNO</h1>
+            <h2 style="color: var(--card-yellow); margin-bottom: 30px;">NO MERCY</h2>
+            <input type="text" id="playerName" placeholder="اسمك الكريم...">
+            <div style="display: flex; gap: 10px; flex-direction: column;">
+                <button class="btn-duo" onclick="joinGame(true)">إنشاء روم (أنا الحكم)</button>
+                <button class="btn-duo blue" onclick="joinGame(false)">انضمام كلاعب</button>
+            </div>
+            <div id="lobby-players" style="margin-top: 20px; font-weight: bold; color: var(--card-blue);"></div>
+            <button class="btn-duo red" id="start-btn" style="display: none; margin-top: 20px; width: 100%;" onclick="startGame()">بدء المذبحة!</button>
+        </div>
+    </div>
+
+    <!-- شاشة اللعب -->
+    <div id="game-screen">
+        <div class="hud">
+            <span id="turn-indicator">الدور: جاري التحميل...</span>
+            <span id="stack-indicator" style="color: var(--card-red);"></span>
+        </div>
+        
+        <div class="opponents" id="opponents-ring"></div>
+
+        <div class="table-area">
+            <div class="card black" onclick="drawCard()" style="border: 2px solid white;">سحب</div>
+            <div class="card" id="top-card" style="box-shadow: 0 10px 20px rgba(0,0,0,0.6);"></div>
+            
+            <button class="btn-duo red" style="position: absolute; left: 20px; bottom: 20px; padding: 15px; border-radius: 50%; width: 70px; height: 70px; font-size: 1rem;" onclick="callUno()">UNO</button>
+        </div>
+
+        <div class="hand-container" id="my-hand"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        // الشبكة وإدارة الحالة
+        // ==========================================
+        let ws;
+        let myId = Math.random().toString(36).substr(2, 9);
+        let myName = "";
+        let isHost = false;
+        
+        // هيكل اللعبة (يتواجد فقط عند المضيف Host)
+        let gameState = {
+            status: 'waiting', players: [], deck: [], discardPile: [], 
+            currentTurnIndex: 0, direction: 1, stackAmount: 0, activeColor: ''
+        };
+
+        function showToast(msg) {
+            let t = document.getElementById('toast');
+            t.innerText = msg; t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
+        }
+
+        function joinGame(hostReq) {
+            let nameInput = document.getElementById('playerName').value.trim();
+            if(!nameInput) return showToast("أدخل اسمك أولاً!");
+            
+            myName = nameInput;
+            isHost = hostReq;
+            
+            if(isHost) {
+                document.getElementById('start-btn').style.display = 'block';
+                gameState.players.push({ id: myId, name: myName, hand: [], eliminated: false });
+            }
+
+            ws = new WebSocket(`ws://${location.host}/ws`);
+            
+            ws.onopen = () => {
+                ws.send(JSON.stringify({ type: 'join', id: myId, name: myName, asHost: isHost }));
+                updateLobbyUI();
+            };
+
+            ws.onmessage = (event) => {
+                let data = JSON.parse(event.data);
+                
+                // المضيف يتلقى الحركات ويعالجها، ثم يبث الحالة
+                if (isHost && data.type === 'join' && data.id !== myId) {
+                    gameState.players.push({ id: data.id, name: data.name, hand: [], eliminated: false });
+                    broadcastState();
+                } else if (isHost && data.type === 'action') {
+                    processAction(data.actionData);
+                } 
+                // الجميع يتلقى تحديثات الحالة من المضيف
+                else if (data.type === 'state_update') {
+                    gameState = data.state;
+                    renderGame();
+                }
+            };
+        }
+
+        function broadcastState() {
+            if(!isHost) return;
+            ws.send(JSON.stringify({ type: 'state_update', state: gameState }));
+            renderGame(); // تحديث واجهة المضيف نفسه
+        }
+
+        function updateLobbyUI() {
+            document.getElementById('lobby-players').innerText = `عدد اللاعبين: ${gameState.players.length}`;
+        }
+
+        // ==========================================
+        // محرك اللعبة (يعمل فقط على جهاز الـ Host)
+        // ==========================================
+        function startGame() {
+            gameState.deck = generateNoMercyDeck();
+            
+            // توزيع 7 أوراق
+            gameState.players.forEach(p => {
+                for(let i=0; i<7; i++) p.hand.push(gameState.deck.pop());
+            });
+
+            // سحب أول ورقة رقمية للطاولة
+            let firstCard;
+            do {
+                firstCard = gameState.deck.pop();
+                if(isNaN(firstCard.val)) gameState.deck.unshift(firstCard);
+            } while (isNaN(firstCard.val));
+
+            gameState.discardPile.push(firstCard);
+            gameState.activeColor = firstCard.color;
+            gameState.status = 'playing';
+            
+            broadcastState();
+        }
+
+        function generateNoMercyDeck() {
+            let deck = [];
+            const colors = ['red', 'blue', 'green', 'yellow'];
+            let idCounter = 0;
+            
+            colors.forEach(c => {
+                for(let i=1; i<=9; i++) { for(let j=0; j<3; j++) deck.push({id: idCounter++, color: c, val: i}); }
+                for(let j=0; j<2; j++) { deck.push({id: idCounter++, color: c, val: '0'}); deck.push({id: idCounter++, color: c, val: '7'}); }
+                for(let j=0; j<3; j++) { deck.push({id: idCounter++, color: c, val: 'Skip'}); deck.push({id: idCounter++, color: c, val: 'Rev'}); deck.push({id: idCounter++, color: c, val: '+2', draw: 2}); }
+                deck.push({id: idCounter++, color: c, val: '+4', draw: 4}); deck.push({id: idCounter++, color: c, val: '+4', draw: 4});
+            });
+            for(let i=0; i<6; i++) {
+                deck.push({id: idCounter++, color: 'black', val: 'W'});
+                deck.push({id: idCounter++, color: 'black', val: 'W+6', draw: 6});
+                deck.push({id: idCounter++, color: 'black', val: 'W+10', draw: 10});
+            }
+            return deck.sort(() => Math.random() - 0.5);
+        }
+
+        function processAction(action) {
+            let currentPlayer = gameState.players[gameState.currentTurnIndex];
+            if(action.playerId !== currentPlayer.id) return; // ليس دوره
+
+            if(action.type === 'play_card') {
+                let p = gameState.players.find(pl => pl.id === action.playerId);
+                let cIndex = p.hand.findIndex(c => c.id === action.cardId);
+                let card = p.hand[cIndex];
+
+                // التحقق من التراكم (لا رحمة)
+                if(gameState.stackAmount > 0 && !card.draw) return; 
+                if(card.color !== 'black' && card.color !== gameState.activeColor && card.val !== gameState.discardPile[gameState.discardPile.length-1].val) return;
+
+                p.hand.splice(cIndex, 1);
+                gameState.discardPile.push(card);
+                if(card.color !== 'black') gameState.activeColor = card.color;
+
+                if(card.draw) gameState.stackAmount += card.draw;
+                if(card.val === 'Rev') gameState.direction *= -1;
+                
+                advanceTurn(card.val === 'Skip' || (card.val === 'Rev' && gameState.players.length === 2) ? 2 : 1);
+            } 
+            else if (action.type === 'draw_card') {
+                let p = gameState.players.find(pl => pl.id === action.playerId);
+                let draws = gameState.stackAmount > 0 ? gameState.stackAmount : 1;
+                
+                for(let i=0; i<draws; i++) {
+                    p.hand.push(gameState.deck.pop());
+                    if(p.hand.length >= 25) { p.eliminated = true; break; } // قاعدة الرحمة!
+                }
+                gameState.stackAmount = 0;
+                advanceTurn(1);
+            }
+            broadcastState();
+        }
+
+        function advanceTurn(steps) {
+            do {
+                gameState.currentTurnIndex = (gameState.currentTurnIndex + (gameState.direction * steps) + gameState.players.length) % gameState.players.length;
+                steps = 1;
+            } while (gameState.players[gameState.currentTurnIndex].eliminated);
+        }
+
+        // ==========================================
+        // واجهة المستخدم (Render)
+        // ==========================================
+        function sendAction(actionData) {
+            if(isHost) processAction(actionData);
+            else ws.send(JSON.stringify({ type: 'action', actionData: actionData }));
+        }
+
+        function renderGame() {
+            if(gameState.status !== 'playing') { updateLobbyUI(); return; }
+            
+            document.getElementById('lobby-screen').style.display = 'none';
+            document.getElementById('game-screen').style.display = 'flex';
+
+            let activePlayer = gameState.players[gameState.currentTurnIndex];
+            document.getElementById('turn-indicator').innerText = `الدور: ${activePlayer.name}`;
+            document.getElementById('stack-indicator').innerText = gameState.stackAmount > 0 ? `تراكم: +${gameState.stackAmount}` : '';
+
+            // الخصوم
+            let oppHTML = '';
+            gameState.players.forEach(p => {
+                if(p.id !== myId && !p.eliminated) {
+                    let isActive = p.id === activePlayer.id ? 'active' : '';
+                    oppHTML += `<div class="opp-badge ${isActive}">${p.name}<br><span style="font-size:0.9rem">${p.hand.length} أوراق</span></div>`;
+                }
+            });
+            document.getElementById('opponents-ring').innerHTML = oppHTML;
+
+            // الطاولة
+            let topCard = gameState.discardPile[gameState.discardPile.length - 1];
+            let topColor = topCard.color === 'black' ? gameState.activeColor : topCard.color;
+            let tcEl = document.getElementById('top-card');
+            tcEl.className = `card ${topColor}`;
+            tcEl.innerText = topCard.val;
+
+            // أوراقي
+            let me = gameState.players.find(p => p.id === myId);
+            let myHandHTML = '';
+            if(!me.eliminated) {
+                me.hand.forEach((c, index) => {
+                    myHandHTML += `<div class="card ${c.color}" style="z-index:${index}" onclick="playMyCard(${c.id})">${c.val}</div>`;
+                });
+            } else {
+                myHandHTML = `<h2 style="color:var(--card-red)">لقد تم طردك! (قاعدة الرحمة)</h2>`;
+            }
+            document.getElementById('my-hand').innerHTML = myHandHTML;
+        }
+
+        function playMyCard(cardId) {
+            sendAction({ type: 'play_card', playerId: myId, cardId: cardId });
+        }
+
+        function drawCard() {
+            sendAction({ type: 'draw_card', playerId: myId });
+        }
+
+        function callUno() {
+            showToast("UNO!");
+        }
+    </script>
+</body>
+</html>
