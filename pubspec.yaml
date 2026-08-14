@@ -1,5 +1,5 @@
-name: local_hotspot_game
-description: UNO Hotspot Server
+name: uno_no_mercy_pro
+description: Enterprise Grade UNO Local Server
 publish_to: 'none'
 version: 1.0.0+1
 
